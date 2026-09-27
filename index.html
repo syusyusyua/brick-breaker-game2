@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>네온 브릭 브레이커 (Neon Brick Breaker)</title>
+
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 15%, #181135 0%, #0a0818 70%, #030208 100%);
+      color: #f1f5f9;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    .font-arcade {
+      font-family: 'Orbitron', monospace, sans-serif;
+      letter-spacing: 0.06em;
+    }
+    .neon-text-pink {
+      text-shadow: 0 0 10px rgba(244, 63, 94, 0.75), 0 0 25px rgba(244, 63, 94, 0.45);
+    }
+    .neon-text-cyan {
+      text-shadow: 0 0 10px rgba(6, 182, 212, 0.75), 0 0 25px rgba(6, 182, 212, 0.45);
+    }
+    .neon-border-cyan {
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.35), inset 0 0 15px rgba(6, 182, 212, 0.15);
+    }
+    .glass-card {
+      background: rgba(18, 16, 38, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    ::-webkit-scrollbar {
+      width: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(6, 182, 212, 0.45);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(6, 182, 212, 0.8);
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.9; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.02); }
+    }
+    .glow-pulse {
+      animation: pulseGlow 2.4s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-100 antialiased overflow-x-hidden p-2 sm:p-4 md:p-6">
+
+  <header class="w-full max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl glass-card border border-white/10 mb-4 shadow-2xl">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-rose-500/25">
+        <i class="fa-solid fa-shapes text-lg text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-xl sm:text-2xl font-black font-arcade neon-text-pink tracking-wider">CYBER BRICK</h1>
+        <p class="text-xs text-slate-400 font-medium hidden sm:block">Firebase Realtime Database Live Arcade</p>
+      </div>
+    </div>
+
+    <!-- Active User & Sound Toggles -->
+    <div class="flex items-center space-x-2 sm:space-x-4">
+      <div class="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs sm:text-sm">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span class="text-slate-400">플레이어:</span>
+        <span id="current-player-name" class="font-bold text-cyan-300">로그인 필요</span>
+      </div>
+      <button id="btn-change-user" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition border border-white/10 flex items-center space-x-1.5 text-slate-300 hover:text-white">
+        <i class="fa-solid fa-user-pen"></i>
+        <span>이름 변경</span>
+      </button>
+      <button id="btn-toggle-sound" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition border border-white/10 flex items-center justify-center text-cyan-400">
+        <i id="sound-icon" class="fa-solid fa-volume-high"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-7xl mx-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+    
+    <!-- Game Canvas Section (8 Columns) -->
+    <section class="lg:col-span-8 flex flex-col items-center w-full">
+      <!-- HUD Dashboard -->
+      <div class="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl glass-card mb-3 text-xs sm:text-sm font-arcade border border-white/10 shadow-lg">
+        <div class="flex items-center space-x-4 sm:space-x-6">
+          <div class="flex flex-col">
+            <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold">점수 (SCORE)</span>
+            <span id="hud-score" class="text-lg sm:text-2xl font-bold text-amber-400 drop-shadow">0</span>
+          </div>
+          <div class="flex flex-col">
+            <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold">콤보 (COMBO)</span>
+            <span id="hud-combo" class="text-lg sm:text-2xl font-bold text-cyan-400">x1</span>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-4 sm:space-x-6">
+          <div class="flex flex-col text-right">
+            <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold">남은 벽돌</span>
+            <span id="hud-bricks" class="text-lg sm:text-2xl font-bold text-rose-400">0</span>
+          </div>
+          <div class="flex flex-col items-end">
+            <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold">생명 (LIVES)</span>
+            <div id="hud-lives" class="flex space-x-1 text-rose-500 text-base sm:text-lg mt-0.5">
+              <i class="fa-solid fa-heart"></i>
+              <i class="fa-solid fa-heart"></i>
+              <i class="fa-solid fa-heart"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canvas Frame -->
+      <div class="relative w-full aspect-[4/3] max-h-[620px] rounded-2xl overflow-hidden glass-card neon-border-cyan border border-cyan-500/30 flex items-center justify-center bg-black/60 shadow-2xl">
+        <canvas id="gameCanvas" width="800" height="600" class="w-full h-full block cursor-none"></canvas>
+
+        <!-- Start Overlay -->
+        <div id="start-overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-10 transition-opacity duration-300">
+          <div class="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/50 flex items-center justify-center mb-4 text-rose-400 text-3xl shadow-lg shadow-rose-500/30 glow-pulse">
+            <i class="fa-solid fa-gamepad"></i>
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-extrabold font-arcade neon-text-pink mb-2">NEON BREAKOUT</h2>
+          <p class="text-slate-300 text-sm sm:text-base max-w-md mb-6 leading-relaxed">
+            키보드 방향키 [←] [→]로 패들을 조작하여 벽돌을 모두 깨뜨리고 최고 점수로 명예의 전당에 오르세요!
+          </p>
+          <div class="flex flex-wrap items-center justify-center gap-3 mb-6 text-xs text-slate-400">
+            <span class="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10"><kbd class="text-cyan-300 font-bold font-arcade">Space</kbd> / 클릭: 발사</span>
+            <span class="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10"><kbd class="text-cyan-300 font-bold font-arcade">← →</kbd> 또는 마우스/터치</span>
+          </div>
+          <button id="btn-start-game" class="px-8 py-3.5 rounded-xl font-arcade font-bold text-base sm:text-lg bg-gradient-to-r from-rose-500 via-pink-500 to-cyan-500 hover:from-rose-400 hover:to-cyan-400 text-white shadow-xl shadow-rose-500/25 active:scale-95 transition transform">
+            <i class="fa-solid fa-play mr-2"></i> 게임 시작 (START)
+          </button>
+        </div>
+
+        <!-- Game Result Overlay -->
+        <div id="result-overlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-lg flex flex-col items-center justify-center p-6 text-center z-20">
+          <div id="result-icon-container" class="w-20 h-20 rounded-full flex items-center justify-center mb-4 text-4xl shadow-xl"></div>
+          <h2 id="result-title" class="text-3xl sm:text-5xl font-black font-arcade mb-2">GAME OVER</h2>
+          <p id="result-desc" class="text-slate-300 text-sm sm:text-base mb-6">모든 기회를 소진하였습니다.</p>
+
+          <div class="w-full max-w-xs p-4 rounded-xl bg-white/5 border border-white/10 mb-6 flex flex-col space-y-2 font-arcade">
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-400">최종 점수:</span>
+              <span id="result-final-score" class="font-bold text-amber-400 text-lg">0</span>
+            </div>
+            <div class="flex justify-between text-xs text-slate-400">
+              <span>Firebase 연동 상태:</span>
+              <span id="result-save-status" class="text-cyan-300">저장 준비 중...</span>
+            </div>
+          </div>
+
+          <div class="flex space-x-3">
+            <button id="btn-restart-game" class="px-6 py-3 rounded-xl font-arcade font-bold text-sm sm:text-base bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/25 active:scale-95 transition">
+              <i class="fa-solid fa-rotate-right mr-1.5"></i> 다시 도전하기
+            </button>
+          </div>
+        </div>
+
+        <!-- Launch Ball Prompt -->
+        <div id="launch-hint" class="hidden absolute bottom-12 pointer-events-none px-4 py-2 rounded-xl bg-black/80 border border-cyan-400/40 text-cyan-300 font-arcade text-xs sm:text-sm animate-bounce shadow-lg">
+          [ Space ] 또는 화면을 클릭하여 공을 발사하세요!
+        </div>
+      </div>
+
+      <!-- Quick Control Helper Bar -->
+      <div class="w-full flex items-center justify-between text-xs text-slate-400 mt-3 px-2">
+        <div class="flex items-center space-x-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-cyan-400"></span>
+          <span>아이템: <span class="text-pink-400">패들 확장 (W)</span>, <span class="text-cyan-400">멀티볼 (3x)</span>, <span class="text-amber-400">슬로우 모션 (S)</span></span>
+        </div>
+        <div class="hidden sm:block">
+          <span>방향키 [←] [→]로 패들 이동</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Leaderboard Section (4 Columns) -->
+    <aside class="lg:col-span-4 w-full flex flex-col space-y-4">
+      <div class="glass-card rounded-2xl p-5 border border-white/10 shadow-2xl relative overflow-hidden">
+        <!-- Glow accent -->
+        <div class="absolute -top-12 -right-12 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div class="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+          <div class="flex items-center space-x-2.5">
+            <i class="fa-solid fa-trophy text-amber-400 text-lg"></i>
+            <h2 class="font-arcade font-bold text-lg text-slate-100">명예의 전당 TOP 10</h2>
+          </div>
+          <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center space-x-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span id="database-mode-label">Firebase 실시간</span>
+          </span>
+        </div>
+
+        <!-- Top 10 List -->
+        <div class="flex flex-col space-y-2 max-h-[460px] overflow-y-auto pr-1" id="leaderboard-container">
+          <div class="text-center py-10 text-slate-400 text-xs flex flex-col items-center">
+            <i class="fa-solid fa-circle-notch fa-spin text-cyan-400 text-2xl mb-2"></i>
+            실시간 랭킹 로딩 중...
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+          <span>* Firebase Realtime DB 자동 동기화</span>
+          <span id="connection-status" class="text-emerald-400 flex items-center gap-1">
+            <i class="fa-solid fa-wifi text-[10px]"></i> 온라인
+          </span>
+        </div>
+      </div>
+
+      <!-- Point Scoring Rules -->
+      <div class="glass-card rounded-2xl p-4 border border-white/10 text-xs text-slate-300 space-y-2">
+        <h3 class="font-bold text-cyan-300 flex items-center space-x-1.5 font-arcade text-sm">
+          <i class="fa-solid fa-star text-amber-400"></i>
+          <span>벽돌 점수 규칙</span>
+        </h3>
+        <div class="grid grid-cols-2 gap-2 pt-1 font-mono">
+          <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500"></span><span>루비: 50점 (내구도 2)</span></div>
+          <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-orange-500 shadow-sm shadow-orange-500"></span><span>앰버: 40점</span></div>
+          <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-yellow-400 shadow-sm shadow-yellow-400"></span><span>골드: 30점</span></div>
+          <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400"></span><span>에메랄드: 20점</span></div>
+          <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400"></span><span>사파이어: 10점</span></div>
+          <div class="flex items-center space-x-2 text-rose-300 font-bold"><i class="fa-solid fa-bolt text-amber-400"></i><span>연속 파괴 시 콤보 배수</span></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Nickname Entry Modal -->
+  <div id="user-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-card max-w-sm w-full p-6 rounded-2xl border border-cyan-500/40 neon-border-cyan shadow-2xl flex flex-col items-center text-center transform transition-all">
+      <div class="w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 text-2xl mb-4 shadow-lg shadow-cyan-500/20">
+        <i class="fa-solid fa-id-badge"></i>
+      </div>
+      <h3 class="text-xl font-bold font-arcade text-white mb-1">플레이어 등록</h3>
+      <p class="text-xs text-slate-400 mb-5 leading-normal">
+        순위표에 등록될 닉네임을 입력해 주세요.<br/>게임 결과가 실시간 순위에 기록됩니다.
+      </p>
+
+      <form id="nickname-form" class="w-full flex flex-col space-y-3.5">
+        <div class="relative w-full">
+          <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input
+            id="nickname-input"
+            type="text"
+            maxlength="12"
+            placeholder="닉네임 입력 (최대 12자)"
+            required
+            class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900/90 border border-white/20 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-slate-100 placeholder-slate-500 text-sm outline-none transition"
+          />
+        </div>
+        <button
+          type="submit"
+          class="w-full py-3 rounded-xl font-arcade font-bold text-sm bg-gradient-to-r from-cyan-500 to-rose-500 hover:from-cyan-400 hover:to-rose-400 text-white shadow-lg shadow-cyan-500/25 active:scale-95 transition"
+        >
+          입장하기 (ENTER)
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none px-4 py-3 rounded-xl glass-card border border-cyan-400/40 text-cyan-300 font-arcade text-xs shadow-2xl flex items-center space-x-2">
+    <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+    <span id="toast-text">알림 내용</span>
+  </div>
+
+  <footer class="w-full max-w-7xl mx-auto text-center py-4 text-xs text-slate-400">
+    <p>© Cyber Brick Breaker &middot; Firebase Realtime Database Leaderboard</p>
+  </footer>
+
+  <script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { 
+      getDatabase, 
+      ref, 
+      push, 
+      query, 
+      orderByChild, 
+      limitToLast, 
+      onValue, 
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDrJJcgGNbIZkXB4_Ho29DbwD7DMEbdWs0",
+      authDomain: "brick-breaker-game-fa55b.firebaseapp.com",
+      databaseURL: "https://brick-breaker-game-fa55b-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "brick-breaker-game-fa55b",
+      storageBucket: "brick-breaker-game-fa55b.firebasestorage.app",
+      messagingSenderId: "758787439751",
+      appId: "1:758787439751:web:3d00f8147614445c4b8c22"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const scoresRef = ref(database, 'leaderboard');
+
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playPaddleHit() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(560, this.ctx.currentTime + 0.08);
+
+        gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      }
+
+      playBrickHit(combo = 1) {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const baseFreq = 440 + Math.min(combo * 45, 600);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(baseFreq, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, this.ctx.currentTime + 0.09);
+
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.09);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.09);
+      }
+
+      playPowerup() {
+        if (!this.enabled) return;
+        this.init();
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.05);
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.05 + 0.1);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + idx * 0.05);
+          osc.stop(this.ctx.currentTime + idx * 0.05 + 0.1);
+        });
+      }
+
+      playLoseLife() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(260, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.35);
+
+        gain.gain.setValueAtTime(0.22, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.35);
+      }
+
+      playVictory() {
+        if (!this.enabled) return;
+        this.init();
+        const chords = [
+          [523.25, 659.25, 783.99],
+          [587.33, 739.99, 880.00],
+          [659.25, 830.61, 987.77],
+          [1046.50, 1318.51, 1567.98]
+        ];
+        chords.forEach((chord, i) => {
+          chord.forEach(freq => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.16);
+            gain.gain.setValueAtTime(0.12, this.ctx.currentTime + i * 0.16);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.16 + 0.28);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(this.ctx.currentTime + i * 0.16);
+            osc.stop(this.ctx.currentTime + i * 0.16 + 0.28);
+          });
+        });
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    const leaderboardContainer = document.getElementById('leaderboard-container');
+    const connectionStatusEl = document.getElementById('connection-status');
+    const databaseModeLabel = document.getElementById('database-mode-label');
+
+    function escapeHTML(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Subscribe to Firebase Realtime Leaderboard Query (Top 10 sorted by score)
+    function setupLeaderboardListener() {
+      try {
+        const top10Query = query(scoresRef, orderByChild('score'), limitToLast(10));
+        onValue(top10Query, (snapshot) => {
+          const scores = [];
+          snapshot.forEach((child) => {
+            scores.push({
+              key: child.key,
+              ...child.val()
+            });
+          });
+
+          // Firebase returns ascending order; reverse to get rank 1 on top
+          scores.reverse();
+          renderLeaderboard(scores);
+          connectionStatusEl.innerHTML = `<i class="fa-solid fa-wifi text-[10px]"></i> 온라인`;
+          connectionStatusEl.className = "text-emerald-400 flex items-center gap-1";
+        }, (error) => {
+          console.warn("Firebase query error:", error);
+          connectionStatusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-[10px]"></i> 오프라인 모드`;
+          connectionStatusEl.className = "text-amber-400 flex items-center gap-1";
+          databaseModeLabel.textContent = "로컬 백업 모드";
+          loadLocalFallbackLeaderboard();
+        });
+      } catch (err) {
+        console.warn("Failed to listen to Firebase:", err);
+        loadLocalFallbackLeaderboard();
+      }
+    }
+
+    function renderLeaderboard(list) {
+      if (!list || list.length === 0) {
+        leaderboardContainer.innerHTML = `
+          <div class="text-center py-8 text-slate-400 text-xs">
+            아직 등록된 랭킹이 없습니다.<br/>첫 번째 챔피언이 되어보세요!
+          </div>
+        `;
+        return;
+      }
+
+      leaderboardContainer.innerHTML = '';
+      list.forEach((item, index) => {
+        const rank = index + 1;
+        let rankBadge = `<span class="w-6 text-center font-bold text-slate-400 font-arcade text-xs">${rank}</span>`;
+        let cardBg = 'bg-white/5 hover:bg-white/10';
+        let nameColor = 'text-slate-200';
+
+        if (rank === 1) {
+          rankBadge = `<span class="w-6 text-center text-amber-400 text-sm drop-shadow"><i class="fa-solid fa-crown"></i></span>`;
+          cardBg = 'bg-gradient-to-r from-amber-500/15 to-transparent border-l-2 border-amber-400';
+          nameColor = 'text-amber-300 font-bold';
+        } else if (rank === 2) {
+          rankBadge = `<span class="w-6 text-center text-slate-300 text-sm"><i class="fa-solid fa-medal"></i></span>`;
+          cardBg = 'bg-gradient-to-r from-slate-400/15 to-transparent border-l-2 border-slate-300';
+          nameColor = 'text-slate-200 font-semibold';
+        } else if (rank === 3) {
+          rankBadge = `<span class="w-6 text-center text-amber-600 text-sm"><i class="fa-solid fa-medal"></i></span>`;
+          cardBg = 'bg-gradient-to-r from-amber-700/15 to-transparent border-l-2 border-amber-600';
+          nameColor = 'text-amber-200 font-semibold';
+        }
+
+        const dateStr = item.date || (item.timestamp ? new Date(item.timestamp).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '최근');
+
+        const row = document.createElement('div');
+        row.className = `flex items-center justify-between p-2.5 rounded-xl border border-white/5 ${cardBg} transition`;
+        row.innerHTML = `
+          <div class="flex items-center space-x-2.5 overflow-hidden">
+            ${rankBadge}
+            <div class="flex flex-col truncate">
+              <span class="text-xs ${nameColor} truncate font-arcade">${escapeHTML(item.name || '익명')}</span>
+              <span class="text-[10px] text-slate-400">${dateStr}</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="font-arcade font-bold text-xs sm:text-sm text-cyan-300">${(item.score || 0).toLocaleString()}</span>
+            <span class="text-[9px] text-slate-400 block font-arcade">PTS</span>
+          </div>
+        `;
+        leaderboardContainer.appendChild(row);
+      });
+    }
+
+    // Local Fallback Storage Handler
+    function loadLocalFallbackLeaderboard() {
+      const fallbackData = [
+        { name: "CYBER_ACE", score: 1850, date: "9. 24. 14:20" },
+        { name: "NEO_RUNNER", score: 1420, date: "9. 25. 18:30" },
+        { name: "PIXEL_GOD", score: 1100, date: "9. 26. 20:15" },
+        { name: "RETRO_FAN", score: 850, date: "9. 27. 09:40" },
+        { name: "ARCADE_BOY", score: 620, date: "9. 27. 11:20" }
+      ];
+      renderLeaderboard(fallbackData);
+    }
+
+    async function saveScoreToFirebase(playerName, finalScore) {
+      const statusEl = document.getElementById('result-save-status');
+      statusEl.textContent = 'Firebase 저장 중...';
+
+      try {
+        await push(scoresRef, {
+          name: playerName || '익명 플레이어',
+          score: Number(finalScore) || 0,
+          timestamp: Date.now(),
+          date: new Date().toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        });
+        statusEl.textContent = 'Firebase 저장 성공! ✓';
+        statusEl.className = 'text-emerald-400 font-bold';
+        showToast(`점수 (${finalScore}점)가 실시간 순위표에 기록되었습니다!`);
+      } catch (error) {
+        console.error('Firebase save error:', error);
+        statusEl.textContent = '오프라인 기록됨 (로컬)';
+        statusEl.className = 'text-amber-400';
+        showToast('네트워크 오류로 로컬 세션에 임시 저장되었습니다.');
+      }
+    }
+
+    let currentPlayer = localStorage.getItem('cyber_brick_player') || '';
+
+    const userModal = document.getElementById('user-modal');
+    const nicknameInput = document.getElementById('nickname-input');
+    const nicknameForm = document.getElementById('nickname-form');
+    const currentPlayerDisplay = document.getElementById('current-player-name');
+    const btnChangeUser = document.getElementById('btn-change-user');
+    const toast = document.getElementById('toast');
+    const toastText = document.getElementById('toast-text');
+
+    function updatePlayerUI() {
+      currentPlayerDisplay.textContent = currentPlayer || '로그인 필요';
+    }
+
+    function openUserModal() {
+      nicknameInput.value = currentPlayer || '';
+      userModal.classList.remove('hidden');
+      setTimeout(() => nicknameInput.focus(), 120);
+    }
+
+    function closeUserModal() {
+      userModal.classList.add('hidden');
+    }
+
+    nicknameForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = nicknameInput.value.trim();
+      if (val) {
+        currentPlayer = val;
+        localStorage.setItem('cyber_brick_player', currentPlayer);
+        updatePlayerUI();
+        closeUserModal();
+        showToast(`환영합니다, ${currentPlayer} 님!`);
+      }
+    });
+
+    btnChangeUser.addEventListener('click', openUserModal);
+
+    function showToast(msg) {
+      toastText.textContent = msg;
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-24', 'opacity-0');
+      }, 3000);
+    }
+
+    // Sound toggle
+    const btnToggleSound = document.getElementById('btn-toggle-sound');
+    const soundIcon = document.getElementById('sound-icon');
+    btnToggleSound.addEventListener('click', () => {
+      sound.enabled = !sound.enabled;
+      if (sound.enabled) {
+        soundIcon.className = "fa-solid fa-volume-high";
+        showToast("효과음 켜짐");
+      } else {
+        soundIcon.className = "fa-solid fa-volume-xmark text-slate-500";
+        showToast("효과음 음소거");
+      }
+    });
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const hudScore = document.getElementById('hud-score');
+    const hudCombo = document.getElementById('hud-combo');
+    const hudBricks = document.getElementById('hud-bricks');
+    const hudLives = document.getElementById('hud-lives');
+    const startOverlay = document.getElementById('start-overlay');
+    const resultOverlay = document.getElementById('result-overlay');
+    const resultTitle = document.getElementById('result-title');
+    const resultDesc = document.getElementById('result-desc');
+    const resultFinalScore = document.getElementById('result-final-score');
+    const resultIconContainer = document.getElementById('result-icon-container');
+    const launchHint = document.getElementById('launch-hint');
+    const btnStart = document.getElementById('btn-start-game');
+    const btnRestart = document.getElementById('btn-restart-game');
+
+    const STATE = { MENU: 0, PLAYING: 1, BALL_READY: 2, GAMEOVER: 3, VICTORY: 4 };
+    let gameState = STATE.MENU;
+
+    let score = 0;
+    let combo = 0;
+    let comboTimer = 0;
+    let lives = 3;
+
+    const paddle = {
+      width: 130,
+      height: 16,
+      x: 335,
+      y: 560,
+      speed: 9.5,
+      baseWidth: 130,
+      glowColor: '#06b6d4',
+      targetWidth: 130
+    };
+
+    let balls = [];
+    let bricks = [];
+    let particles = [];
+    let powerUps = [];
+
+    const BRICK_ROWS = 5;
+    const BRICK_COLS = 9;
+    const BRICK_HEIGHT = 22;
+    const BRICK_PADDING = 8;
+    const BRICK_OFFSET_TOP = 50;
+    const BRICK_OFFSET_LEFT = 35;
+
+    const ROW_METRICS = [
+      { color: '#f43f5e', glow: '#fb7185', points: 50, name: 'ruby' },
+      { color: '#f97316', glow: '#fb923c', points: 40, name: 'amber' },
+      { color: '#eab308', glow: '#fde047', points: 30, name: 'gold' },
+      { color: '#10b981', glow: '#34d399', points: 20, name: 'emerald' },
+      { color: '#06b6d4', glow: '#67e8f9', points: 10, name: 'sapphire' }
+    ];
+
+    function createBall(isStuck = true) {
+      return {
+        x: paddle.x + paddle.width / 2,
+        y: paddle.y - 10,
+        radius: 7,
+        dx: (Math.random() > 0.5 ? 1 : -1) * (4 + Math.random() * 1.5),
+        dy: -6,
+        isStuck: isStuck,
+        speed: 7,
+        trail: []
+      };
+    }
+
+    function initBricks() {
+      bricks = [];
+      const brickWidth = (canvas.width - (BRICK_OFFSET_LEFT * 2) - ((BRICK_COLS - 1) * BRICK_PADDING)) / BRICK_COLS;
+      
+      for (let r = 0; r < BRICK_ROWS; r++) {
+        for (let c = 0; c < BRICK_COLS; c++) {
+          const rowData = ROW_METRICS[r % ROW_METRICS.length];
+          const bx = BRICK_OFFSET_LEFT + c * (brickWidth + BRICK_PADDING);
+          const by = BRICK_OFFSET_TOP + r * (BRICK_HEIGHT + BRICK_PADDING);
+          
+          bricks.push({
+            x: bx,
+            y: by,
+            w: brickWidth,
+            h: BRICK_HEIGHT,
+            color: rowData.color,
+            glow: rowData.glow,
+            points: rowData.points,
+            alive: true,
+            maxHp: r === 0 ? 2 : 1, // First row requires two hits
+            hp: r === 0 ? 2 : 1
+          });
+        }
+      }
+      updateHUD();
+    }
+
+    function resetGame() {
+      score = 0;
+      combo = 0;
+      comboTimer = 0;
+      lives = 3;
+      paddle.width = paddle.baseWidth;
+      paddle.targetWidth = paddle.baseWidth;
+      paddle.x = (canvas.width - paddle.width) / 2;
+      balls = [createBall(true)];
+      particles = [];
+      powerUps = [];
+      initBricks();
+      updateHUD();
+      setGameState(STATE.BALL_READY);
+    }
+
+    function setGameState(newState) {
+      gameState = newState;
+      if (newState === STATE.BALL_READY) {
+        launchHint.classList.remove('hidden');
+        startOverlay.classList.add('hidden');
+        resultOverlay.classList.add('hidden');
+      } else if (newState === STATE.PLAYING) {
+        launchHint.classList.add('hidden');
+        startOverlay.classList.add('hidden');
+        resultOverlay.classList.add('hidden');
+      } else if (newState === STATE.GAMEOVER) {
+        launchHint.classList.add('hidden');
+        showGameOverScreen();
+      } else if (newState === STATE.VICTORY) {
+        launchHint.classList.add('hidden');
+        showVictoryScreen();
+      }
+    }
+
+    // Particles system
+    function spawnParticles(x, y, color, count = 14) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 5 + 1.5;
+        particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: Math.random() * 3 + 1.5,
+          color: color,
+          alpha: 1,
+          decay: Math.random() * 0.03 + 0.02
+        });
+      }
+    }
+
+    // Power-up spawning
+    const POWERUP_TYPES = [
+      { type: 'expand', label: 'W', color: '#ec4899' },
+      { type: 'multiball', label: '3x', color: '#06b6d4' },
+      { type: 'slow', label: 'S', color: '#eab308' }
+    ];
+
+    function maybeSpawnPowerUp(x, y) {
+      if (Math.random() < 0.22) {
+        const item = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+        powerUps.push({
+          x: x,
+          y: y,
+          w: 26,
+          h: 26,
+          vy: 2.2,
+          type: item.type,
+          label: item.label,
+          color: item.color
+        });
+      }
+    }
+
+    function applyPowerUp(type) {
+      sound.playPowerup();
+      if (type === 'expand') {
+        paddle.targetWidth = Math.min(paddle.baseWidth * 1.6, 210);
+        showToast("패들 확장!");
+        setTimeout(() => { paddle.targetWidth = paddle.baseWidth; }, 9000);
+      } else if (type === 'multiball') {
+        const activeBall = balls[0] || { x: paddle.x + paddle.width / 2, y: paddle.y - 10, speed: 7 };
+        balls.push({
+          x: activeBall.x,
+          y: activeBall.y,
+          radius: 7,
+          dx: -4.5,
+          dy: -5.5,
+          speed: activeBall.speed || 7,
+          isStuck: false,
+          trail: []
+        });
+        balls.push({
+          x: activeBall.x,
+          y: activeBall.y,
+          radius: 7,
+          dx: 4.5,
+          dy: -5.5,
+          speed: activeBall.speed || 7,
+          isStuck: false,
+          trail: []
+        });
+        showToast("멀티 볼 소환!");
+      } else if (type === 'slow') {
+        balls.forEach(b => {
+          b.speed = Math.max(4.5, b.speed * 0.7);
+          const currentSpd = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
+          b.dx = (b.dx / currentSpd) * b.speed;
+          b.dy = (b.dy / currentSpd) * b.speed;
+        });
+        showToast("슬로우 모션!");
+      }
+    }
+
+    const keys = { ArrowLeft: false, ArrowRight: false, a: false, d: false };
+
+    window.addEventListener('keydown', (e) => {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+        e.preventDefault();
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.ArrowLeft = true;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.ArrowRight = true;
+      if (e.key === ' ' || e.code === 'Space') {
+        triggerBallLaunch();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.ArrowLeft = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.ArrowRight = false;
+    });
+
+    function triggerBallLaunch() {
+      if (gameState === STATE.BALL_READY) {
+        balls.forEach(b => {
+          if (b.isStuck) {
+            b.isStuck = false;
+            b.dx = (Math.random() - 0.5) * 6;
+            b.dy = -b.speed;
+          }
+        });
+        setGameState(STATE.PLAYING);
+        sound.playPaddleHit();
+      }
+    }
+
+    function handlePointerMove(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const mouseCanvasX = (clientX - rect.left) * scaleX;
+      paddle.x = Math.max(0, Math.min(canvas.width - paddle.width, mouseCanvasX - paddle.width / 2));
+    }
+
+    canvas.addEventListener('mousemove', (e) => handlePointerMove(e.clientX));
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) handlePointerMove(e.touches[0].clientX);
+    }, { passive: true });
+    canvas.addEventListener('click', triggerBallLaunch);
+    canvas.addEventListener('touchstart', triggerBallLaunch, { passive: true });
+
+    function updatePhysics() {
+      if (Math.abs(paddle.width - paddle.targetWidth) > 0.5) {
+        paddle.width += (paddle.targetWidth - paddle.width) * 0.15;
+      }
+
+      if (keys.ArrowLeft) paddle.x = Math.max(0, paddle.x - paddle.speed);
+      if (keys.ArrowRight) paddle.x = Math.min(canvas.width - paddle.width, paddle.x + paddle.speed);
+
+      if (combo > 1) {
+        comboTimer -= 1;
+        if (comboTimer <= 0) {
+          combo = 1;
+          updateHUD();
+        }
+      }
+
+      for (let i = balls.length - 1; i >= 0; i--) {
+        const b = balls[i];
+
+        if (b.isStuck) {
+          b.x = paddle.x + paddle.width / 2;
+          b.y = paddle.y - b.radius;
+          continue;
+        }
+
+        b.trail.push({ x: b.x, y: b.y, alpha: 0.55 });
+        if (b.trail.length > 7) b.trail.shift();
+
+        b.x += b.dx;
+        b.y += b.dy;
+
+        // Walls
+        if (b.x - b.radius <= 0) {
+          b.x = b.radius;
+          b.dx = Math.abs(b.dx);
+          sound.playPaddleHit();
+        } else if (b.x + b.radius >= canvas.width) {
+          b.x = canvas.width - b.radius;
+          b.dx = -Math.abs(b.dx);
+          sound.playPaddleHit();
+        }
+
+        if (b.y - b.radius <= 0) {
+          b.y = b.radius;
+          b.dy = Math.abs(b.dy);
+          sound.playPaddleHit();
+        }
+
+        // Paddle Collision
+        if (
+          b.y + b.radius >= paddle.y &&
+          b.y - b.radius <= paddle.y + paddle.height &&
+          b.x >= paddle.x - b.radius &&
+          b.x <= paddle.x + paddle.width + b.radius &&
+          b.dy > 0
+        ) {
+          b.dy = -Math.abs(b.dy);
+          const hitPoint = (b.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+          const bounceAngle = hitPoint * (Math.PI / 3);
+
+          b.speed = Math.min(10.5, b.speed + 0.1);
+          b.dx = b.speed * Math.sin(bounceAngle);
+          b.dy = -b.speed * Math.cos(bounceAngle);
+
+          spawnParticles(b.x, paddle.y, paddle.glowColor, 8);
+          sound.playPaddleHit();
+        }
+
+        // Brick Collisions
+        for (let j = 0; j < bricks.length; j++) {
+          const br = bricks[j];
+          if (!br.alive) continue;
+
+          if (
+            b.x + b.radius >= br.x &&
+            b.x - b.radius <= br.x + br.w &&
+            b.y + b.radius >= br.y &&
+            b.y - b.radius <= br.y + br.h
+          ) {
+            const prevX = b.x - b.dx;
+            if (prevX + b.radius <= br.x || prevX - b.radius >= br.x + br.w) {
+              b.dx = -b.dx;
+            } else {
+              b.dy = -b.dy;
+            }
+
+            br.hp -= 1;
+            if (br.hp <= 0) {
+              br.alive = false;
+              spawnParticles(br.x + br.w / 2, br.y + br.h / 2, br.glow, 16);
+              maybeSpawnPowerUp(br.x + br.w / 2, br.y + br.h / 2);
+
+              combo++;
+              comboTimer = 140;
+              score += br.points * combo;
+              sound.playBrickHit(combo);
+            } else {
+              spawnParticles(b.x, b.y, '#ffffff', 6);
+              sound.playBrickHit(1);
+            }
+
+            updateHUD();
+            checkVictoryCondition();
+            break;
+          }
+        }
+
+        // Bottom border
+        if (b.y - b.radius > canvas.height) {
+          balls.splice(i, 1);
+        }
+      }
+
+      if (balls.length === 0 && gameState === STATE.PLAYING) {
+        lives--;
+        combo = 0;
+        sound.playLoseLife();
+        updateHUD();
+
+        if (lives <= 0) {
+          setGameState(STATE.GAMEOVER);
+        } else {
+          balls = [createBall(true)];
+          setGameState(STATE.BALL_READY);
+        }
+      }
+
+      // Update Power-ups
+      for (let i = powerUps.length - 1; i >= 0; i--) {
+        const p = powerUps[i];
+        p.y += p.vy;
+
+        if (
+          p.y + p.h >= paddle.y &&
+          p.y <= paddle.y + paddle.height &&
+          p.x + p.w >= paddle.x &&
+          p.x <= paddle.x + paddle.width
+        ) {
+          applyPowerUp(p.type);
+          spawnParticles(p.x + p.w / 2, p.y + p.h / 2, p.color, 12);
+          powerUps.splice(i, 1);
+          continue;
+        }
+
+        if (p.y > canvas.height) {
+          powerUps.splice(i, 1);
+        }
+      }
+
+      // Update Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.alpha -= pt.decay;
+        if (pt.alpha <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function checkVictoryCondition() {
+      const remaining = bricks.filter(b => b.alive).length;
+      if (remaining === 0 && gameState === STATE.PLAYING) {
+        sound.playVictory();
+        score += lives * 350; // Bonus for surviving with lives
+        updateHUD();
+        setGameState(STATE.VICTORY);
+      }
+    }
+
+    function render() {
+      ctx.fillStyle = 'rgba(6, 5, 14, 0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Grid background
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Bricks
+      bricks.forEach(b => {
+        if (!b.alive) return;
+        ctx.save();
+        ctx.shadowColor = b.glow;
+        ctx.shadowBlur = b.hp > 1 ? 16 : 8;
+
+        const grad = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
+        grad.addColorStop(0, b.glow);
+        grad.addColorStop(1, b.color);
+        ctx.fillStyle = grad;
+        roundRect(ctx, b.x, b.y, b.w, b.h, 4, true, false);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.fillRect(b.x + 2, b.y + 2, b.w - 4, 3);
+
+        if (b.hp > 1) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          roundRect(ctx, b.x + 1, b.y + 1, b.w - 2, b.h - 2, 4, false, true);
+        }
+        ctx.restore();
+      });
+
+      // Power-ups
+      powerUps.forEach(p => {
+        ctx.save();
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = p.color;
+        roundRect(ctx, p.x, p.y, p.w, p.h, 6, true, false);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 12px Orbitron, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.label, p.x + p.w / 2, p.y + p.h / 2);
+        ctx.restore();
+      });
+
+      // Paddle
+      ctx.save();
+      ctx.shadowColor = paddle.glowColor;
+      ctx.shadowBlur = 20;
+
+      const padGrad = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x, paddle.y + paddle.height);
+      padGrad.addColorStop(0, '#67e8f9');
+      padGrad.addColorStop(0.5, '#06b6d4');
+      padGrad.addColorStop(1, '#0e7490');
+
+      ctx.fillStyle = padGrad;
+      roundRect(ctx, paddle.x, paddle.y, paddle.width, paddle.height, 8, true, false);
+
+      ctx.fillStyle = '#ffffff';
+      roundRect(ctx, paddle.x + 8, paddle.y + 3, paddle.width - 16, 3, 2, true, false);
+      ctx.restore();
+
+      // Balls & Trails
+      balls.forEach(b => {
+        b.trail.forEach((t, idx) => {
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, b.radius * (0.4 + (idx / b.trail.length) * 0.6), 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(6, 182, 212, ${t.alpha * 0.5})`;
+          ctx.fill();
+        });
+
+        ctx.save();
+        ctx.shadowColor = '#67e8f9';
+        ctx.shadowBlur = 16;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        const ballGrad = ctx.createRadialGradient(b.x - 2, b.y - 2, 1, b.x, b.y, b.radius);
+        ballGrad.addColorStop(0, '#ffffff');
+        ballGrad.addColorStop(0.4, '#a5f3fc');
+        ballGrad.addColorStop(1, '#06b6d4');
+        ctx.fillStyle = ballGrad;
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // Particles
+      particles.forEach(pt => {
+        ctx.save();
+        ctx.globalAlpha = pt.alpha;
+        ctx.shadowColor = pt.color;
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = pt.color;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      if (fill) ctx.fill();
+      if (stroke) ctx.stroke();
+    }
+
+    function updateHUD() {
+      hudScore.textContent = score.toLocaleString();
+      hudCombo.textContent = combo > 1 ? `x${combo}` : 'x1';
+      hudCombo.className = combo > 1 ? 'text-lg sm:text-2xl font-bold text-rose-400 animate-pulse' : 'text-lg sm:text-2xl font-bold text-cyan-400';
+      
+      hudBricks.textContent = bricks.filter(b => b.alive).length;
+
+      let hearts = '';
+      for (let i = 0; i < 3; i++) {
+        hearts += (i < lives) 
+          ? '<i class="fa-solid fa-heart text-rose-500"></i>' 
+          : '<i class="fa-regular fa-heart text-slate-600"></i>';
+      }
+      hudLives.innerHTML = hearts;
+    }
+
+    function showGameOverScreen() {
+      resultOverlay.classList.remove('hidden');
+      resultTitle.textContent = "GAME OVER";
+      resultTitle.className = "text-3xl sm:text-5xl font-black font-arcade mb-2 neon-text-pink text-rose-500";
+      resultDesc.textContent = "모든 생명을 소진했습니다. 다음엔 더 높은 점수에 도전하세요!";
+      resultFinalScore.textContent = score.toLocaleString();
+
+      resultIconContainer.className = "w-20 h-20 rounded-full flex items-center justify-center mb-4 text-4xl shadow-xl bg-rose-500/20 text-rose-400 border border-rose-500/40";
+      resultIconContainer.innerHTML = '<i class="fa-solid fa-skull"></i>';
+
+      saveScoreToFirebase(currentPlayer || "익명", score);
+    }
+
+    function showVictoryScreen() {
+      resultOverlay.classList.remove('hidden');
+      resultTitle.textContent = "VICTORY CLEAR!";
+      resultTitle.className = "text-3xl sm:text-5xl font-black font-arcade mb-2 neon-text-cyan text-cyan-400";
+      resultDesc.textContent = "모든 벽돌을 파괴했습니다! 축하합니다, 챔피언!";
+      resultFinalScore.textContent = score.toLocaleString();
+
+      resultIconContainer.className = "w-20 h-20 rounded-full flex items-center justify-center mb-4 text-4xl shadow-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 glow-pulse";
+      resultIconContainer.innerHTML = '<i class="fa-solid fa-trophy"></i>';
+
+      saveScoreToFirebase(currentPlayer || "익명", score);
+    }
+
+    function gameLoop() {
+      updatePhysics();
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+
+    btnStart.addEventListener('click', () => {
+      sound.init();
+      if (!currentPlayer) {
+        openUserModal();
+        return;
+      }
+      resetGame();
+    });
+
+    btnRestart.addEventListener('click', () => {
+      sound.init();
+      resetGame();
+    });
+
+    // Initialize application
+    window.addEventListener('DOMContentLoaded', () => {
+      updatePlayerUI();
+      setupLeaderboardListener();
+      initBricks();
+      render();
+
+      if (!currentPlayer) {
+        setTimeout(openUserModal, 500);
+      }
+
+      gameLoop();
+    });
+  </script>
+</body>
+</html>
